@@ -1,0 +1,156 @@
+{% comment %}
+  Renders product variant options
+
+  Accepts:
+  - product: {Object} product object.
+  - option: {Object} current product_option object.
+  - block: {Object} block object.
+
+
+  Usage:
+  {% render 'product-variant-options',
+    product: product,
+    option: option,
+    block: block
+  %}
+{% endcomment %}
+{%- liquid
+  assign variants_available_arr = product.variants | map: 'available'
+  assign variants_option1_arr = product.variants | map: 'option1'
+  assign variants_option2_arr = product.variants | map: 'option2'
+  assign variants_option3_arr = product.variants | map: 'option3'
+
+  assign product_form_id = 'product-form-' | append: section.id
+  
+-%}
+
+
+{%- for value in option.values -%}
+  {%- liquid
+    assign option_disabled = true
+
+    for option1_name in variants_option1_arr
+      case option.position
+        when 1
+          if variants_option1_arr[forloop.index0] == value and variants_available_arr[forloop.index0]
+            assign option_disabled = false
+          endif
+        when 2
+          if option1_name == product.selected_or_first_available_variant.option1 and variants_option2_arr[forloop.index0] == value and variants_available_arr[forloop.index0]
+            assign option_disabled = false
+          endif
+        when 3
+          if option1_name == product.selected_or_first_available_variant.option1 and variants_option2_arr[forloop.index0] == product.selected_or_first_available_variant.option2 and variants_option3_arr[forloop.index0] == value and variants_available_arr[forloop.index0]
+            assign option_disabled = false
+          endif
+      endcase
+    endfor
+  -%}
+
+  {%- if block.settings.picker_type == 'button' -%}
+    <input
+      type="radio"
+      id="{{ section.id }}-{{ option.position }}-{{ forloop.index0 }}"
+      name="{{ option.name }}"
+      value="{{ value | escape }}"
+      form="{{ product_form_id }}"
+      {% if option.selected_value == value %}
+        checked
+      {% endif %}
+      {% if option_disabled %}
+        class="disabled"
+      {% endif %}
+    >
+
+     <!-- zenon start --> 
+        {% assign variant_needed = null %}
+        {% for variant in product.variants %}
+        {% if variant.options contains value %}
+        {% assign variant_needed = variant %}
+        {% endif %}
+        {% endfor %}
+
+        {% if settings.product_swatch == true %}
+            {% assign keys =  settings.swatch_name | split: ',' %}
+            {% for key in keys %} 
+              {% if option.name contains key %}
+              {% assign variant_name = option.name %}
+              {% endif %}
+            {% endfor %} 
+
+            
+            {% assign assign variant_colors_raw = settings.swatch_color_code | newline_to_br | strip_newlines | split: '<br />' %}
+            {% assign variant_color_names = '' | split: ',' %}
+            {% assign variant_colors = '' | split: ',' %}
+            {% for variant_color_raw in variant_colors_raw %}
+              {%  assign variant_color = variant_color_raw | split: ':' | last | strip %}
+               {% if variant_color != '' %}
+                {%  assign variant_color = variant_color | split: ':'  %}
+                 {% assign variant_colors = variant_colors | concat: variant_color %}
+                 {% assign variant_color_name = variant_color_raw | split: ':' | first | strip | downcase | split: ':' %}
+                 {% assign variant_color_names = variant_color_names | concat: variant_color_name %}
+               {% endif %}
+            {% endfor %}
+
+           {% assign assign variant_images_raw = settings.swatch_color_image | newline_to_br | strip_newlines | split: '<br />' %}
+            {% assign variant_image_names = '' | split: ',' %}
+            {% assign variant_images = '' | split: ',' %}
+            {% for variant_image_raw in variant_images_raw %}
+              {%  assign variant_image = variant_image_raw | split: ':' | last | strip %}
+               {% if variant_image != '' %}
+                {%  assign variant_image = variant_image | split: ':'  %}
+                 {% assign variant_images = variant_images | concat: variant_image %}
+                 {% assign variant_image_name = variant_image_raw | split: ':' | first | strip | downcase | split: ':' %}
+                 {% assign variant_image_names = variant_image_names | concat: variant_image_name %}
+               {% endif %}
+            {% endfor %}
+        {% endif %}
+    
+         {% if option.name == variant_name and variant_needed.featured_image != blank or variant_color_names != blank or variant_image_names != blank %}
+            <label class="option-image {% if section.settings.color_swatch_option == 'color_option' %} color-style {% endif %}" for="{{ section.id }}-{{ option.position }}-{{ forloop.index0 }}">
+                {% if variant_needed.featured_image != blank and section.settings.color_swatch_option == 'image_option' %}
+                  <img src="{{ variant_needed.featured_image | img_url }}" alt="{{ variant_needed.title }}" title="{{ value }}">
+                {% else %}
+                    {% if variant_color_names != blank %}
+                      {%- for color_name in variant_color_names -%}
+                        {% assign color_name_id = color_name | handleize %}
+                        {% assign color_name_match = value | handleize %}
+                         {% if color_name_id ==  color_name_match %}
+                           <span class="color-swatch {{ value | handleize }}"  title="{{ value }}" style="background-color:{{ variant_colors[forloop.index0] }};"></span>
+                         {% endif %}
+                      {%- endfor -%}
+                    {% else %}
+                        {% if variant_image_names != blank %}
+                            {%- for image_name in variant_image_names -%}
+                              {% assign image_name_id = image_name | handleize %}
+                              {% assign color_name_match = value | handleize %}
+                               {% if image_name_id ==  color_name_match %}
+                                 <span class="color-swatch {{ value | handleize }}"  title="{{ value }}" style="background:url('{{ variant_images[forloop.index0] | file_url}}');"></span>
+                               {% endif %}
+                            {%- endfor -%}
+                        {% endif %}
+                    {% endif %}
+                {% endif %}
+            </label>
+          {% else %}
+             <label for="{{ section.id }}-{{ option.position }}-{{ forloop.index0 }}">
+                {{ value -}}
+                <span class="visually-hidden">{{ 'products.product.variant_sold_out_or_unavailable' | t }}</span>
+             </label>
+          {% endif %}
+    <!-- zenon end --> 
+  {%- elsif block.settings.picker_type == 'dropdown' -%}
+    <option
+      value="{{ value | escape }}"
+      {% if option.selected_value == value %}
+        selected="selected"
+      {% endif %}
+    >
+      {% if option_disabled -%}
+        {{- 'products.product.value_unavailable' | t: option_value: value -}}
+      {%- else -%}
+        {{- value -}}
+      {%- endif %}
+    </option>
+  {%- endif -%}
+{%- endfor -%}
